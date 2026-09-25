@@ -7605,7 +7605,6 @@ dependencies = [
  "zakura-node-services",
  "zakura-orchard",
  "zakura-reddsa",
- "zakura-rpc",
 ]
 
 [[package]]
