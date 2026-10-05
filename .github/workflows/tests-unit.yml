@@ -513,6 +513,37 @@ jobs:
           # Failed, non-skipped jobs still fail this aggregate status.
           allowed-skips: check-no-git-dependencies, pruned-storage, zakura-config, build-tests, unit-tests, extended-reissuance-properties, network-dependent, publish-graph
 
+  # The single status check that branch rulesets require for this workflow.
+  # Add a job to `needs` to make it a merge gate. Unlike `test success`, it
+  # does not need `publish-graph` or `check-no-git-dependencies`: those jobs
+  # fail on git dependencies and `[patch.crates-io]` git sources.
+  required-checks:
+    name: Required status checks have passed
+    runs-on: ubuntu-latest
+    # Skip, rather than fail, when a superseding run cancelled this one.
+    # See "Cancelled runs" in .github/workflows/README.md.
+    if: ${{ !cancelled() || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    needs:
+      - changes
+      - build-tests
+      - unit-tests
+      - zakura-config
+      - extended-reissuance-properties
+      - network-dependent
+      - pruned-storage
+    permissions: {}
+    timeout-minutes: 5
+    steps:
+      - name: Determine whether all required-pass steps succeeded
+        run: |
+          echo "${NEEDS}" | jq -e --argjson allowed "${ALLOWED_SKIPS}" \
+            '[ to_entries[] | .value.result == "success" or (.value.result == "skipped" and (.key | IN($allowed[]))) ] | all'
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          # These jobs skip outside their event or changed-path scope, as
+          # described for `allowed-skips` in the `test success` job.
+          ALLOWED_SKIPS: '["build-tests", "unit-tests", "zakura-config", "extended-reissuance-properties", "network-dependent", "pruned-storage"]'
+
   report-nightly-result:
     name: report nightly release test result
     needs: test-success
