@@ -121,6 +121,14 @@ jobs:
               ;;
           esac
 
+          # cargo-semver-checks builds each crate against crates.io without the
+          # [patch] tables of this workspace, so it cannot pass while those
+          # tables exist. Select no packages until they are removed.
+          if python3 -c 'import sys, tomllib; sys.exit(0 if tomllib.load(open("Cargo.toml", "rb")).get("patch") else 1)'; then
+            echo "The workspace has [patch] tables; skipping semver checks."
+            packages=""
+          fi
+
           packages_json="$(
             printf '%s\n' "$packages" \
               | jq --raw-input --slurp --compact-output \

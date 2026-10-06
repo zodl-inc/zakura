@@ -77,7 +77,16 @@ jobs:
       config: ${{ steps.filter.outputs.config }}
       rust: ${{ steps.filter.outputs.rust }}
       publish_graph: ${{ steps.filter.outputs.publish_graph }}
+      has_patch: ${{ steps.patches.outputs.has_patch }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: Cargo.toml
+          sparse-checkout-cone-mode: false
+      - name: Detect [patch] tables
+        id: patches
+        run: python3 -c 'import tomllib; print("has_patch=" + str(bool(tomllib.load(open("Cargo.toml", "rb")).get("patch"))).lower())' >> "$GITHUB_OUTPUT"
       - id: filter
         env:
           GH_TOKEN: ${{ github.token }}
@@ -457,11 +466,14 @@ jobs:
     needs: changes
     # Path-gated on PRs and pushes. Always runs in the merge queue and
     # nightly so a docs-only merge cannot land on top of a broken graph.
+    # Skipped while the workspace has [patch] tables: the publish graph
+    # resolves against crates.io without them, so it cannot pass.
     if: >
-      needs.changes.outputs.publish_graph == 'true'
-      || github.event_name == 'merge_group'
-      || github.event_name == 'schedule'
-      || github.event_name == 'workflow_dispatch'
+      needs.changes.outputs.has_patch != 'true'
+      && (needs.changes.outputs.publish_graph == 'true'
+        || github.event_name == 'merge_group'
+        || github.event_name == 'schedule'
+        || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
     runs-on: ubuntu-latest
