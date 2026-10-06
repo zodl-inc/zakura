@@ -104,7 +104,14 @@ jobs:
           # Treat warnings as errors, preserving the old `features` job behavior.
           RUSTFLAGS: -D warnings
 
+      # Packaged crates resolve against crates.io without the [patch] tables
+      # of this workspace, so this check cannot pass while those tables exist.
+      - name: Detect [patch] tables
+        id: patches
+        run: python3 -c 'import tomllib; print("has_patch=" + str(bool(tomllib.load(open("Cargo.toml", "rb")).get("patch"))).lower())' >> "$GITHUB_OUTPUT"
+
       - name: Check publishable crate packaging
+        if: steps.patches.outputs.has_patch != 'true'
         run: ./scripts/check-crate-packaging.sh
 
   test-crate-build-success:
